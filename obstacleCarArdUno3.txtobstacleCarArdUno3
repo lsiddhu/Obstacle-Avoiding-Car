@@ -1,0 +1,128 @@
+#include "AFMotor.h"
+#include <Servo.h>
+
+// Ultrasonic sensor pins
+#define trigPin A5
+#define echoPin A4
+
+// Servo object
+Servo myServo;
+
+// Motor definitions (Motor Shield)
+AF_DCMotor motor1(1, MOTOR12_64KHZ);
+AF_DCMotor motor2(2, MOTOR12_64KHZ);
+AF_DCMotor motor3(3, MOTOR12_64KHZ);
+AF_DCMotor motor4(4, MOTOR12_64KHZ);
+
+// Global variables
+int distance_L, distance_F, distance_R;
+long distance;
+int thresholdDistance = 20; // distance in cm to detect obstacle
+
+// ===================================================================
+// Setup
+// ===================================================================
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Obstacle Avoiding Car Started");
+
+  myServo.attach(10);   // Servo pin
+  myServo.write(90);    // Set servo to front
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  // Set motor speeds (0-255)
+  motor1.setSpeed(180);
+  motor2.setSpeed(180);
+  motor3.setSpeed(180);
+  motor4.setSpeed(180);
+}
+
+// ===================================================================
+// Loop
+// ===================================================================
+void loop() {
+  distance_F = measureDistance();
+  Serial.print("Front Distance = ");
+  Serial.println(distance_F);
+
+  if (distance_F > thresholdDistance) {
+    moveForward();
+  } else {
+    stopMotors();
+    scanSurroundings();
+  }
+}
+
+// ===================================================================
+// Functions
+// ===================================================================
+
+// Measure distance using ultrasonic sensor
+long measureDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  distance = pulseIn(echoPin, HIGH);
+  return distance / 29 / 2;  // Convert to cm
+}
+
+// Move forward
+void moveForward() {
+  Serial.println("Moving Forward");
+  motor1.run(FORWARD);
+  motor2.run(FORWARD);
+  motor3.run(FORWARD);
+  motor4.run(FORWARD);
+}
+
+// Stop motors
+void stopMotors() {
+  Serial.println("Stop");
+  motor1.run(RELEASE);
+  motor2.run(RELEASE);
+  motor3.run(RELEASE);
+  motor4.run(RELEASE);
+}
+
+// Compare distances and decide turn
+void compareDistance() {
+  if (distance_L > distance_R) {
+    Serial.println("Turning Left");
+    motor1.run(BACKWARD);
+    motor2.run(BACKWARD);
+    motor3.run(FORWARD);
+    motor4.run(FORWARD);
+    delay(400);
+  } else {
+    Serial.println("Turning Right");
+    motor1.run(FORWARD);
+    motor2.run(FORWARD);
+    motor3.run(BACKWARD);
+    motor4.run(BACKWARD);
+    delay(400);
+  }
+  stopMotors();
+}
+
+// Servo scan left and right
+void scanSurroundings() {
+  // Scan Right
+  myServo.write(0);
+  delay(400);
+  distance_R = measureDistance();
+
+  // Scan Left
+  myServo.write(170);
+  delay(400);
+  distance_L = measureDistance();
+
+  // Reset servo to forward
+  myServo.write(90);
+  delay(300);
+
+  // Compare and decide direction
+  compareDistance();
+}
